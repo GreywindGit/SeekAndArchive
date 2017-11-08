@@ -9,12 +9,14 @@ namespace SeekAndArchive
     class Program
     {
         static List<FileInfo> FoundFiles;
+        static List<FileSystemWatcher> watchers;
 
         static void Main(string[] args)
         {
             string fileName = args[0];
             string directoryName = args[1];
             FoundFiles = new List<FileInfo>();
+            watchers = new List<FileSystemWatcher>();
 
             DirectoryInfo rootDir = new DirectoryInfo(directoryName);
             if (!rootDir.Exists)
@@ -22,12 +24,21 @@ namespace SeekAndArchive
                 Console.WriteLine("The specified directory does not exist.");
                 return;
             }
-            Console.WriteLine($"Searching for {fileName}");
+            Console.WriteLine($"Searching for {fileName} in {directoryName} and its subdirectories.");
             RecursiveSearch(FoundFiles, fileName, rootDir);
             Console.WriteLine("Found {0} files.", FoundFiles.Count);
             foreach (FileInfo fil in FoundFiles)
             {
                 Console.WriteLine("{0}", fil.FullName);
+            }
+            foreach (FileInfo fil in FoundFiles)
+            {
+                FileSystemWatcher newWatcher = new FileSystemWatcher(fil.DirectoryName, fil.Name);
+                newWatcher.Changed += new FileSystemEventHandler(WatcherModified);
+                newWatcher.Renamed += new RenamedEventHandler(WatcherRenamed);
+                newWatcher.Deleted += new FileSystemEventHandler(WatcherModified);
+                newWatcher.EnableRaisingEvents = true;
+                watchers.Add(newWatcher);
             }
             Console.ReadKey();
         }
@@ -80,6 +91,16 @@ namespace SeekAndArchive
                 fileNamePattern = @"^" + firstNamePart + @"[A-Za-z0-9_\-]" + secondNamePart + @"$";
             }
             return fileNamePattern;
+        }
+
+        static void WatcherModified(object sender, FileSystemEventArgs e)
+        {
+            Console.WriteLine($"{e.FullPath} has been {e.ChangeType.ToString().ToLower()}.");
+        }
+
+        static void WatcherRenamed(object sender, RenamedEventArgs e)
+        {
+            Console.WriteLine($"{e.OldFullPath} has been {e.ChangeType.ToString().ToLower()} to {e.FullPath}");
         }
     }
 }
