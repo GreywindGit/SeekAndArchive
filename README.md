@@ -4,3 +4,4 @@ Features:
 - wildcard characters allowed in search strings
 - watchers for files on the search result list
 - event handlers for changing, renaming and deleting watched files
+- archive files with timestamp on change/delete
