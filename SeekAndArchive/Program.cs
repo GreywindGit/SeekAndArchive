@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -10,6 +11,7 @@ namespace SeekAndArchive
     {
         static List<FileInfo> FoundFiles;
         static List<FileSystemWatcher> watchers;
+        static List<DirectoryInfo> archiveDirs;
 
         static void Main(string[] args)
         {
@@ -31,14 +33,21 @@ namespace SeekAndArchive
             {
                 Console.WriteLine("{0}", fil.FullName);
             }
+
             foreach (FileInfo fil in FoundFiles)
             {
                 FileSystemWatcher newWatcher = new FileSystemWatcher(fil.DirectoryName, fil.Name);
-                newWatcher.Changed += new FileSystemEventHandler(WatcherModified);
-                newWatcher.Renamed += new RenamedEventHandler(WatcherRenamed);
-                newWatcher.Deleted += new FileSystemEventHandler(WatcherModified);
+                newWatcher.Changed += new FileSystemEventHandler(OnChanged);
+                newWatcher.Renamed += new RenamedEventHandler(OnRenamed);
+                newWatcher.Deleted += new FileSystemEventHandler(OnChanged);
                 newWatcher.EnableRaisingEvents = true;
                 watchers.Add(newWatcher);
+            }
+
+            archiveDirs = new List<DirectoryInfo>();
+            for (int i = 0; i < FoundFiles.Count; i++)
+            {
+                archiveDirs.Add(Directory.CreateDirectory("archive" + i.ToString()));
             }
             Console.ReadKey();
         }
@@ -93,14 +102,36 @@ namespace SeekAndArchive
             return fileNamePattern;
         }
 
-        static void WatcherModified(object sender, FileSystemEventArgs e)
+        static void OnChanged(object sender, FileSystemEventArgs e)
         {
             Console.WriteLine($"{e.FullPath} has been {e.ChangeType.ToString().ToLower()}.");
+            FileSystemWatcher senderWatcher = (FileSystemWatcher)sender;
+            int index = watchers.IndexOf(senderWatcher, 0);
+            System.Threading.Thread.Sleep(1000);
+            ArchiveFile(archiveDirs[index], FoundFiles[index]);
         }
 
-        static void WatcherRenamed(object sender, RenamedEventArgs e)
+        static void OnRenamed(object sender, RenamedEventArgs e)
         {
             Console.WriteLine($"{e.OldFullPath} has been {e.ChangeType.ToString().ToLower()} to {e.FullPath}");
+        }
+
+        static void ArchiveFile(DirectoryInfo archiveDir, FileInfo fileToArchive)
+        {
+            string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            FileStream input = fileToArchive.OpenRead();
+            FileStream output = File.Create(archiveDir.FullName + @"\"  + fileToArchive.Name + timeStamp + ".gz");
+            GZipStream Compressor = new GZipStream(output, CompressionMode.Compress);
+            int b = input.ReadByte();
+            while (b != -1)
+            {
+                Compressor.WriteByte((byte)b);
+
+                b = input.ReadByte();
+            }
+            Compressor.Close();
+            input.Close();
+            output.Close();
         }
     }
 }
